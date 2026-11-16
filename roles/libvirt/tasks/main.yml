@@ -1,0 +1,33 @@
+---
+- name: Install Libvirt packages
+  ansible.builtin.apt:
+    name: "{{ libvirt_packages }}"
+    state: present
+  notify: Restart libvirt
+
+- name: Enable Libvirt socket
+  ansible.builtin.systemd:
+    name: libvirtd.socket
+    enabled: true
+    state: started
+  failed_when: false
+
+- name: Enable modular Libvirt QEMU socket
+  ansible.builtin.systemd:
+    name: virtqemud.socket
+    enabled: true
+    state: started
+  failed_when: false
+
+- name: Create local Libvirt image directory
+  ansible.builtin.file:
+    path: /var/lib/libvirt/images
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Verify Libvirt connection
+  ansible.builtin.command: virsh -c qemu:///system list --all
+  register: virsh_result
+  changed_when: false 

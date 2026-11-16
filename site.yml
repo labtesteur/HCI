@@ -1,0 +1,26 @@
+---
+- name: Deploy HCI cluster prerequisites
+  hosts: hci
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: common
+      tags:
+        - common
+
+    - role: kvm
+      tags:
+        - kvm
+
+    - role: libvirt
+      tags:
+        - libvirt
+
+    - role: ceph
+      tags:
+        - ceph
+
+    - role: cli
+      tags:
+        - cli

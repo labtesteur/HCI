@@ -1,0 +1,65 @@
+---
+hci_domain: hci.local
+hci_network: "192.168.10.0/24"
+
+hci_hosts:
+  - ip: "192.168.10.201"
+    hostname: "HCI-1"
+  - ip: "192.168.10.202"
+    hostname: "HCI-2"
+  - ip: "192.168.10.203"
+    hostname: "HCI-3"
+
+common_packages:
+  - vim
+  - nano
+  - curl
+  - wget
+  - gpg
+  - git
+  - chrony
+  - htop
+  - jq
+  - rsync
+  - lsof
+  - tcpdump
+  - bridge-utils
+  - python3
+  - python3-pip
+  - python3-libvirt
+
+kvm_packages:
+  - qemu-system-x86
+  - qemu-utils
+  - qemu-kvm
+  - ovmf
+
+libvirt_packages:
+  - libvirt-daemon-system
+  - libvirt-daemon-driver-qemu
+  - libvirt-daemon-driver-storage-rbd
+  - libvirt-clients
+  - libvirt-clients-qemu
+  - virtinst
+  - dnsmasq-base
+
+ceph_packages:
+  - ceph
+  - ceph-common
+  - ceph-mon
+  - ceph-mgr
+  - ceph-osd
+  - ceph-volume
+  - librados2
+  - librbd1
+  - python3-rados
+  - python3-rbd
+
+cli_packages:
+  - virtinst
+  - libguestfs-tools
+  - guestfs-tools
+  - cloud-image-utils
+  - genisoimage
+
+ceph_osd_device: /dev/sdb

@@ -1,0 +1,12 @@
+---
+- name: Restart libvirt
+  ansible.builtin.systemd:
+    name: libvirtd
+    state: restarted
+  failed_when: false
+
+- name: Restart virtqemud
+  ansible.builtin.systemd:
+    name: virtqemud
+    state: restarted
+  failed_when: false

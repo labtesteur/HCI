@@ -1,0 +1,48 @@
+---
+- name: Add HCI nodes to Ceph cluster
+  hosts: HCI-1
+  become: true
+  gather_facts: false
+
+  tasks:
+
+    - name: Get Ceph cluster public SSH key
+      ansible.builtin.slurp:
+        src: /etc/ceph/ceph.pub
+      register: ceph_public_key
+
+    - name: Install Ceph SSH key on nodes to join
+      ansible.posix.authorized_key:
+        user: root
+        key: "{{ ceph_public_key.content | b64decode }}"
+        state: present
+      delegate_to: "{{ item }}"
+      loop: "{{ groups['ceph_join'] }}"
+
+    - name: Add hosts to Ceph orchestrator
+      ansible.builtin.command:
+        cmd: >
+          cephadm shell -- ceph orch host add
+          {{ item }}
+          {{ hostvars[item].ansible_host }}
+      loop: "{{ groups['ceph_join'] }}"
+      register: ceph_host_add
+      changed_when: "'Added host' in ceph_host_add.stdout"
+      failed_when:
+        - ceph_host_add.rc != 0
+        - "'already exists' not in ceph_host_add.stderr"
+
+    - name: Refresh devices
+      ansible.builtin.command:
+        cmd: cephadm shell -- ceph orch device ls --refresh
+      changed_when: false
+
+    - name: Display cluster hosts
+      ansible.builtin.command:
+        cmd: cephadm shell -- ceph orch host ls
+      register: ceph_hosts
+      changed_when: false
+
+    - name: Show cluster hosts
+      ansible.builtin.debug:
+        var: ceph_hosts.stdout_lines

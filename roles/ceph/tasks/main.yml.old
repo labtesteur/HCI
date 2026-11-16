@@ -1,0 +1,22 @@
+---
+- name: Install Ceph packages
+  ansible.builtin.apt:
+    name: "{{ ceph_packages }}"
+    state: present
+
+- name: Create Ceph configuration directory
+  ansible.builtin.file:
+    path: /etc/ceph
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Verify Ceph command
+  ansible.builtin.command: ceph --version
+  register: ceph_version
+  changed_when: false
+
+- name: Display installed Ceph version
+  ansible.builtin.debug:
+    var: ceph_version.stdout

@@ -1,0 +1,38 @@
+---
+- name: Install Ceph prerequisites
+  ansible.builtin.apt:
+    name:
+      - cephadm
+      - ceph-common
+      - lvm2
+      - podman
+    state: present
+    update_cache: true
+
+- name: Create Ceph configuration directory
+  ansible.builtin.file:
+    path: /etc/ceph
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Check Ceph OSD disk
+  ansible.builtin.stat:
+    path: "{{ ceph_osd_device }}"
+  register: ceph_disk
+
+- name: Fail if Ceph disk is missing
+  ansible.builtin.fail:
+    msg: "Le disque Ceph /dev/sdb est absent sur {{ inventory_hostname }}"
+  when: not ceph_disk.stat.exists
+
+- name: Check cephadm
+  ansible.builtin.command:
+    cmd: cephadm version
+  register: cephadm_version
+  changed_when: false
+
+- name: Display cephadm version
+  ansible.builtin.debug:
+    var: cephadm_version.stdout

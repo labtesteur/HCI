@@ -1,0 +1,32 @@
+---
+- name: Verify HCI nodes
+  hosts: hci
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Check KVM device
+      ansible.builtin.stat:
+        path: /dev/kvm
+      register: kvm_device
+
+    - name: Check Libvirt
+      ansible.builtin.command: virsh -c qemu:///system list --all
+      register: libvirt_check
+      changed_when: false
+      failed_when: false
+
+    - name: Check Ceph version
+      ansible.builtin.command: ceph --version
+      register: ceph_check
+      changed_when: false
+      failed_when: false
+
+    - name: Display validation summary
+      ansible.builtin.debug:
+        msg:
+          - "Node: {{ inventory_hostname }}"
+          - "KVM disponible: {{ kvm_device.stat.exists }}"
+          - "Libvirt RC: {{ libvirt_check.rc }}"
+          - "Ceph RC: {{ ceph_check.rc }}"
+          - "Ceph: {{ ceph_check.stdout | default('absent') }}"

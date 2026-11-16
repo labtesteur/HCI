@@ -1,0 +1,47 @@
+---
+- name: Bootstrap Ceph cluster on HCI-1
+  hosts: HCI-1
+  become: true
+  gather_facts: true
+
+  vars:
+    ceph_mon_ip: "192.168.10.201"
+    ceph_osd_device: "/dev/sdb"
+
+  tasks:
+
+    - name: Check if Ceph cluster already exists
+      ansible.builtin.stat:
+        path: /etc/ceph/ceph.conf
+      register: ceph_cluster
+
+    - name: Bootstrap Ceph cluster
+      ansible.builtin.command:
+        cmd: >
+          cephadm bootstrap
+          --mon-ip {{ ceph_mon_ip }}
+      when: not ceph_cluster.stat.exists
+
+    - name: Wait for Ceph cluster
+      ansible.builtin.command:
+        cmd: cephadm shell -- ceph status
+      register: ceph_status
+      retries: 10
+      delay: 10
+      until: ceph_status.rc == 0
+      changed_when: false
+
+    - name: Refresh Ceph devices
+      ansible.builtin.command:
+        cmd: cephadm shell -- ceph orch device ls --refresh
+      changed_when: false
+
+    - name: Display available Ceph devices
+      ansible.builtin.command:
+        cmd: cephadm shell -- ceph orch device ls
+      register: ceph_devices
+      changed_when: false
+
+    - name: Show Ceph devices
+      ansible.builtin.debug:
+        var: ceph_devices.stdout_lines

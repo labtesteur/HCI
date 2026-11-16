@@ -1,0 +1,8 @@
+---
+- name: Configure Ceph RBD storage for Libvirt
+  hosts: hci
+  become: true
+  gather_facts: true
+
+  roles:
+    - ceph_libvirt

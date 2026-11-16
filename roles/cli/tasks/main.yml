@@ -1,0 +1,37 @@
+---
+- name: Install HCI CLI tools
+  ansible.builtin.apt:
+    name: "{{ cli_packages }}"
+    state: present
+
+- name: Create HCI status command
+  ansible.builtin.copy:
+    dest: /usr/local/sbin/hci-status
+    owner: root
+    group: root
+    mode: "0755"
+    content: |
+      #!/bin/bash
+
+      echo "=== NODE ==="
+      hostnamectl --static
+
+      echo
+      echo "=== KVM ==="
+      test -e /dev/kvm && echo "KVM: OK" || echo "KVM: ABSENT"
+
+      echo
+      echo "=== LIBVIRT ==="
+      virsh -c qemu:///system list --all
+
+      echo
+      echo "=== CEPH ==="
+      if test -f /etc/ceph/ceph.conf; then
+          ceph status
+      else
+          echo "Cluster Ceph non initialise"
+      fi
+
+      echo
+      echo "=== STORAGE ==="
+      lsblk -o NAME,SIZE,TYPE,FSTYPE,MOUNTPOINTS

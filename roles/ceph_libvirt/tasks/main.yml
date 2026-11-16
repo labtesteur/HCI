@@ -1,0 +1,158 @@
+---
+# ============================================================
+# Création du compte Ceph pour Libvirt
+# Exécuté une seule fois depuis HCI-1
+# ============================================================
+
+- name: Create Ceph client.libvirt user
+  ansible.builtin.command:
+    cmd: >
+      cephadm shell -- ceph auth get-or-create client.libvirt
+      mon 'profile rbd'
+      osd 'profile rbd pool=vm-pool'
+  delegate_to: HCI-1
+  run_once: true
+  changed_when: false
+
+- name: Get Ceph Libvirt key
+  ansible.builtin.command:
+    cmd: cephadm shell -- ceph auth get-key client.libvirt
+  delegate_to: HCI-1
+  run_once: true
+  register: ceph_libvirt_key
+  changed_when: false
+  no_log: true
+
+# ============================================================
+# Récupération de la configuration Ceph depuis HCI-1
+# ============================================================
+
+- name: Read Ceph configuration
+  ansible.builtin.slurp:
+    src: /etc/ceph/ceph.conf
+  delegate_to: HCI-1
+  run_once: true
+  register: ceph_conf
+
+# ============================================================
+# Distribution de la configuration sur chaque hyperviseur
+# ============================================================
+
+- name: Create Ceph directory
+  ansible.builtin.file:
+    path: /etc/ceph
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy Ceph configuration
+  ansible.builtin.copy:
+    content: "{{ ceph_conf.content | b64decode }}"
+    dest: /etc/ceph/ceph.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+# ============================================================
+# Secret Libvirt
+# ============================================================
+
+- name: Set common Libvirt secret UUID
+  ansible.builtin.set_fact:
+    ceph_secret_uuid: "8c6a5c8e-7d91-4a89-a534-451312a93b01"
+
+- name: Create Libvirt secret XML
+  ansible.builtin.copy:
+    dest: /tmp/ceph-secret.xml
+    mode: "0600"
+    content: |
+      <secret ephemeral='no' private='yes'>
+        <uuid>{{ ceph_secret_uuid }}</uuid>
+        <usage type='ceph'>
+          <name>client.libvirt secret</name>
+        </usage>
+      </secret>
+
+- name: Check existing Libvirt secret
+  ansible.builtin.command:
+    cmd: virsh secret-lookup-by-uuid {{ ceph_secret_uuid }}
+  register: libvirt_secret
+  changed_when: false
+  failed_when: false
+
+- name: Define Libvirt Ceph secret
+  ansible.builtin.command:
+    cmd: virsh secret-define /tmp/ceph-secret.xml
+  when: libvirt_secret.rc != 0
+
+- name: Set Libvirt Ceph secret value
+  ansible.builtin.command:
+    cmd: >
+      virsh secret-set-value
+      --secret {{ ceph_secret_uuid }}
+      --base64 {{ ceph_libvirt_key.stdout | trim }}
+  changed_when: false
+  no_log: true
+
+# ============================================================
+# Définition du pool RBD
+# ============================================================
+
+- name: Create Libvirt RBD pool XML
+  ansible.builtin.copy:
+    dest: /tmp/ceph-rbd-pool.xml
+    mode: "0644"
+    content: |
+      <pool type='rbd'>
+        <name>ceph-vm-pool</name>
+        <source>
+          <host name='192.168.10.201'/>
+          <host name='192.168.10.202'/>
+          <host name='192.168.10.203'/>
+          <name>vm-pool</name>
+          <auth type='ceph' username='libvirt'>
+            <secret uuid='{{ ceph_secret_uuid }}'/>
+          </auth>
+        </source>
+      </pool>
+
+- name: Check Libvirt RBD pool
+  ansible.builtin.command:
+    cmd: virsh pool-info ceph-vm-pool
+  register: libvirt_rbd_pool
+  changed_when: false
+  failed_when: false
+
+- name: Define Libvirt RBD pool
+  ansible.builtin.command:
+    cmd: virsh pool-define /tmp/ceph-rbd-pool.xml
+  when: libvirt_rbd_pool.rc != 0
+
+- name: Start Libvirt RBD pool
+  ansible.builtin.command:
+    cmd: virsh pool-start ceph-vm-pool
+  register: pool_start
+  changed_when: pool_start.rc == 0
+  failed_when:
+    - pool_start.rc != 0
+    - "'already active' not in pool_start.stderr"
+
+- name: Enable Libvirt RBD pool at boot
+  ansible.builtin.command:
+    cmd: virsh pool-autostart ceph-vm-pool
+  changed_when: false
+
+# ============================================================
+# Vérification
+# ============================================================
+
+- name: Verify Libvirt RBD pool
+  ansible.builtin.command:
+    cmd: virsh pool-info ceph-vm-pool
+  register: ceph_pool_status
+  changed_when: false
+
+- name: Display RBD pool status
+  ansible.builtin.debug:
+    var: ceph_pool_status.stdout_lines

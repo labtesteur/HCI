@@ -1,0 +1,34 @@
+---
+- name: Check CPU virtualization extensions
+  ansible.builtin.shell: |
+    set -o pipefail
+    grep -Eoc '(vmx|svm)' /proc/cpuinfo
+  args:
+    executable: /bin/bash
+  register: virtualization_extensions
+  changed_when: false
+  failed_when: false
+
+- name: Stop when nested virtualization is unavailable
+  ansible.builtin.fail:
+    msg: "Aucune extension VMX/SVM exposée à {{ inventory_hostname }}."
+  when: virtualization_extensions.stdout | int == 0
+
+- name: Install KVM and QEMU packages
+  ansible.builtin.apt:
+    name: "{{ kvm_packages }}"
+    state: present
+
+- name: Check KVM device
+  ansible.builtin.stat:
+    path: /dev/kvm
+  register: kvm_device
+
+- name: Stop when KVM device is unavailable
+  ansible.builtin.fail:
+    msg: "/dev/kvm est absent sur {{ inventory_hostname }}."
+  when: not kvm_device.stat.exists
+
+- name: Load KVM module
+  ansible.builtin.command: modprobe kvm
+  changed_when: false
